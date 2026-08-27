@@ -1,0 +1,7 @@
+Umbra-Core RSA fixture
+
+This file is encrypted and decrypted by tests/crypto/rsa_engine_test.cpp.
+The test passes only when the decrypted output file matches this plaintext file byte-for-byte.
+
+0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
+repeat-repeat-repeat-repeat-repeat-repeat-repeat-repeat-repeat-repeat

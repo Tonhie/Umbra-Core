@@ -1,0 +1,4 @@
+Umbra-Core SHA-256 fixture
+
+This file is hashed by tests/hash/sha_256_test.cpp.
+The test verifies the SHA-256 digest matches the expected value.

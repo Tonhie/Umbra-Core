@@ -1,0 +1,8 @@
+includedir=/Users/tonhie/Projects/Umbra-Core/third_party/local/include
+libdir=/Users/tonhie/Projects/Umbra-Core/third_party/local/lib
+Name: NTL
+Description: A Library for doing Number Theory
+Version: 11.6.0
+Cflags: -I${includedir} -pthread
+Libs: -L${libdir} -lntl -pthread
+Requires.private: gmp >= 5.0 
