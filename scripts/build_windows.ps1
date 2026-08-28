@@ -70,6 +70,8 @@ if (-not $updated) {
 $bashScript = @"
 set -e
 export MSYS2_ARG_CONV_EXCL='*'
+export MSYSTEM=UCRT64
+export MINGW_PREFIX=/ucrt64
 export PATH=/ucrt64/bin:`$PATH
 pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
 mkdir -p '$buildUnix' '$localUnix'
@@ -78,7 +80,7 @@ echo 'Building GMP from third_party/src ...'
 rm -rf '$buildUnix/gmp-6.3.0'
 mkdir -p '$buildUnix/gmp-6.3.0'
 cd '$buildUnix/gmp-6.3.0'
-'$srcUnix/gmp-6.3.0/configure' --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --with-pic
+'$srcUnix/gmp-6.3.0/configure' --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --with-pic
 make -j`$(nproc)
 make install
 
@@ -86,7 +88,7 @@ echo 'Building NTL from third_party/src ...'
 rm -rf '$buildUnix/ntl-11.6.0'
 cp -R '$srcUnix/ntl-11.6.0' '$buildUnix/ntl-11.6.0'
 cd '$buildUnix/ntl-11.6.0/src'
-'$srcUnix/ntl-11.6.0/src/configure' PREFIX='$localUnix' GMP_PREFIX='$localUnix' NTL_GMP_LIP=on SHARED=off
+'$srcUnix/ntl-11.6.0/src/configure' HOST=x86_64-w64-mingw32 PREFIX='$localUnix' GMP_PREFIX='$localUnix' NTL_GMP_LIP=on SHARED=off
 make -j`$(nproc)
 make install
 
