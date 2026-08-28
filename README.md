@@ -77,6 +77,19 @@ cmake --build --preset debug
 
 `build_deps.sh` 会删除并重新生成 `third_party/build` 与 `third_party/local`，执行前请确认其中没有需要保留的本地文件。
 
+Windows（VS2022）可在“开发者 PowerShell for VS 2022”中自动安装 MSVC 依赖并编译：
+
+```powershell
+.\scripts\build_windows.ps1
+```
+
+脚本会自动下载/初始化 vcpkg，安装 GMP 和 NTL，并构建 `build/windows-x64-debug`。发布构建或 x86 架构示例：
+
+```powershell
+.\scripts\build_windows.ps1 -Configuration Release
+.\scripts\build_windows.ps1 -Architecture x86
+```
+
 ## 运行测试
 
 ```bash
