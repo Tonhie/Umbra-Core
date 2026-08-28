@@ -2,9 +2,7 @@
 param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Debug',
-    [ValidateSet('x64', 'x86')]
-    [string]$Architecture = 'x64',
-    [string]$VcpkgRoot = ''
+    [string]$MsysRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -12,59 +10,78 @@ $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
 function Require-Command {
     param([string]$Name)
-    $command = Get-Command $Name -ErrorAction SilentlyContinue
-    if ($null -eq $command) {
-        throw ('Required command not found: ' + $Name + '. Run this script from the VS2022 Developer PowerShell.')
+    if ($null -eq (Get-Command $Name -ErrorAction SilentlyContinue)) {
+        throw ('Required command not found: ' + $Name)
     }
 }
 
-Require-Command 'git'
-Require-Command 'cmake'
+Require-Command 'winget'
 
-if ([string]::IsNullOrWhiteSpace($VcpkgRoot)) {
-    $VcpkgRoot = Join-Path $workspace 'third_party\vcpkg'
-}
-$VcpkgRoot = [System.IO.Path]::GetFullPath($VcpkgRoot)
-$vcpkgExe = Join-Path $VcpkgRoot 'vcpkg.exe'
-
-if (-not (Test-Path -LiteralPath $vcpkgExe)) {
-    if (-not (Test-Path -LiteralPath $VcpkgRoot)) {
-        Write-Host ('Cloning vcpkg into ' + $VcpkgRoot)
-        & git clone https://github.com/microsoft/vcpkg.git $VcpkgRoot
-        if ($LASTEXITCODE -ne 0) { throw 'git clone failed.' }
+if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
+    $candidates = @('C:\msys64', (Join-Path $env:LOCALAPPDATA 'Programs\msys64'))
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath (Join-Path $candidate 'usr\bin\bash.exe')) {
+            $MsysRoot = $candidate
+            break
+        }
     }
-    Push-Location $VcpkgRoot
-    try {
-        & .\bootstrap-vcpkg.bat -disableMetrics
-        if ($LASTEXITCODE -ne 0) { throw 'vcpkg bootstrap failed.' }
+}
+
+if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
+    Write-Host 'MSYS2 was not found. Installing it with winget.'
+    & winget install --id MSYS2.MSYS2 --exact --accept-source-agreements --accept-package-agreements
+    if ($LASTEXITCODE -ne 0) { throw 'MSYS2 installation failed.' }
+    $candidates = @('C:\msys64', (Join-Path $env:LOCALAPPDATA 'Programs\msys64'))
+    foreach ($candidate in $candidates) {
+        if (Test-Path -LiteralPath (Join-Path $candidate 'usr\bin\bash.exe')) {
+            $MsysRoot = $candidate
+            break
+        }
     }
-    finally { Pop-Location }
 }
 
-$triplet = 'x64-windows'
-if ($Architecture -eq 'x86') { $triplet = 'x86-windows' }
-$ntlPort = Join-Path $VcpkgRoot 'ports\ntl'
-if (-not (Test-Path -LiteralPath $ntlPort)) {
-    $location = Join-Path $VcpkgRoot ('installed\' + $triplet)
-    throw ('The vcpkg checkout has no NTL port. Provide an MSVC-built NTL library under ' + $location)
+if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
+    throw 'MSYS2 was installed but bash.exe could not be located. Pass -MsysRoot C:\msys64.'
 }
 
-Write-Host ('Installing dependencies for ' + $triplet)
-& $vcpkgExe install ('gmp:' + $triplet) ('ntl:' + $triplet)
-if ($LASTEXITCODE -ne 0) { throw 'vcpkg dependency installation failed.' }
+$bash = Join-Path $MsysRoot 'usr\bin\bash.exe'
+$rootUnix = (& (Join-Path $MsysRoot 'usr\bin\cygpath.exe') -u $workspace).Trim()
+$srcUnix = $rootUnix + '/third_party/src'
+$buildUnix = $rootUnix + '/third_party/build/msys2'
+$localUnix = $rootUnix + '/third_party/local-msys2'
+$buildWindows = Join-Path $workspace 'build\windows-msys2'
 
-$depsPrefix = Join-Path $VcpkgRoot ('installed\' + $triplet)
-$presetName = 'windows-' + $Architecture.ToLower() + '-' + $Configuration.ToLower()
-$buildDir = Join-Path $workspace ('build\' + $presetName)
-$toolchainFile = Join-Path $VcpkgRoot 'scripts\buildsystems\vcpkg.cmake'
-$configureArgs = @('-S', $workspace, '-B', $buildDir, '-G', 'Visual Studio 17 2022', '-A', $Architecture, ('-DCMAKE_TOOLCHAIN_FILE=' + $toolchainFile), ('-DUMBRA_DEPS_PREFIX=' + $depsPrefix))
+$bashScript = @"
+set -e
+export MSYS2_ARG_CONV_EXCL='*'
+pacman -Syu --noconfirm
+export PATH=/ucrt64/bin:`$PATH
+pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+mkdir -p '$buildUnix' '$localUnix'
 
-Write-Host 'Configuring CMake'
-& cmake @configureArgs
-if ($LASTEXITCODE -ne 0) { throw 'CMake configure failed.' }
+echo 'Building GMP from third_party/src ...'
+rm -rf '$buildUnix/gmp-6.3.0'
+mkdir -p '$buildUnix/gmp-6.3.0'
+cd '$buildUnix/gmp-6.3.0'
+'$srcUnix/gmp-6.3.0/configure' --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --with-pic
+make -j`$(nproc)
+make install
 
-Write-Host 'Building Umbra-Core'
-& cmake '--build' $buildDir '--config' $Configuration '--target' 'ALL_BUILD'
-if ($LASTEXITCODE -ne 0) { throw 'CMake build failed.' }
+echo 'Building NTL from third_party/src ...'
+rm -rf '$buildUnix/ntl-11.6.0'
+cp -R '$srcUnix/ntl-11.6.0' '$buildUnix/ntl-11.6.0'
+cd '$buildUnix/ntl-11.6.0/src'
+'$srcUnix/ntl-11.6.0/src/configure' PREFIX='$localUnix' GMP_PREFIX='$localUnix' NTL_GMP_LIP=on SHARED=off
+make -j`$(nproc)
+make install
 
-Write-Host ('Build completed: ' + $buildDir)
+echo 'Configuring Umbra-Core ...'
+cmake -S '$rootUnix' -B '$rootUnix/build/windows-msys2' -G Ninja -DCMAKE_BUILD_TYPE='$Configuration' -DUMBRA_DEPS_PREFIX='$localUnix'
+cmake --build '$rootUnix/build/windows-msys2' --target all
+"@
+
+Write-Host 'Updating MSYS2 and building GMP/NTL.'
+& $bash '--login' '-lc' $bashScript
+if ($LASTEXITCODE -ne 0) { throw 'MSYS2 dependency build failed.' }
+
+Write-Host ('Build completed: ' + $buildWindows)

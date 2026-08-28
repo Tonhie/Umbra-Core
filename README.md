@@ -77,17 +77,16 @@ cmake --build --preset debug
 
 `build_deps.sh` 会删除并重新生成 `third_party/build` 与 `third_party/local`，执行前请确认其中没有需要保留的本地文件。
 
-Windows（VS2022）可在“开发者 PowerShell for VS 2022”中自动安装 MSVC 依赖并编译：
+Windows 可在 PowerShell 中自动安装 MSYS2、从仓库源码编译 GMP/NTL，并使用 MSYS2 的 UCRT64 GCC 编译：
 
 ```powershell
 .\scripts\build_windows.ps1
 ```
 
-脚本会自动下载/初始化 vcpkg，安装 GMP，并检查 vcpkg 是否提供 NTL port，随后使用 VS2022 生成器构建 `build/windows-x64-debug`。如果 vcpkg 没有 NTL port，脚本会明确提示并停止，不会误用 Unix 的 `.a` 库。发布构建或 x86 架构示例：
+脚本会检查 MSYS2；若不存在则通过 winget 安装。依赖库会安装到 `third_party/local-msys2`，项目输出目录为 `build/windows-msys2`。这是 MinGW/UCRT64 构建，不能与 VS2022 的 MSVC 编译器或其 `.lib` 文件混用。发布构建示例：
 
 ```powershell
 .\scripts\build_windows.ps1 -Configuration Release
-.\scripts\build_windows.ps1 -Architecture x86
 ```
 
 ## 运行测试
