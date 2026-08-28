@@ -20,7 +20,6 @@ function Require-Command {
 
 Require-Command 'git'
 Require-Command 'cmake'
-Require-Command 'cl'
 
 if ([string]::IsNullOrWhiteSpace($VcpkgRoot)) {
     $VcpkgRoot = Join-Path $workspace 'third_party\vcpkg'
