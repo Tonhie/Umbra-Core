@@ -83,7 +83,7 @@ Windows（VS2022）可在“开发者 PowerShell for VS 2022”中自动安装 M
 .\scripts\build_windows.ps1
 ```
 
-脚本会自动下载/初始化 vcpkg，安装 GMP 和 NTL，并构建 `build/windows-x64-debug`。发布构建或 x86 架构示例：
+脚本会自动下载/初始化 vcpkg，安装 GMP，并检查 vcpkg 是否提供 NTL port，随后使用 VS2022 生成器构建 `build/windows-x64-debug`。如果 vcpkg 没有 NTL port，脚本会明确提示并停止，不会误用 Unix 的 `.a` 库。发布构建或 x86 架构示例：
 
 ```powershell
 .\scripts\build_windows.ps1 -Configuration Release
