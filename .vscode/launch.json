@@ -6,7 +6,7 @@
             "type": "lldb-dap",
             "request": "launch",
             "program": "${workspaceFolder}/build/debug/${input:moduleTestExecutable}",
-            "args": [],
+            "args": ["${input:programArgs}"],
             "cwd": "${workspaceFolder}",
             "stopOnEntry": false
         }
@@ -15,7 +15,7 @@
         {
             "id": "moduleTestExecutable",
             "type": "pickString",
-            "description": "Select a module test executable to debug",
+            "description": "Select an executable to debug",
             "options": [
                 "umbra_crypto_rsa_engine_test",
                 "umbra_hash_sha_256_test",
@@ -25,9 +25,16 @@
                 "umbra_certificate_authority_test",
                 "umbra_certificate_library_test",
                 "umbra_pki_user_test",
-                "umbra_secure_mail_test"
+                "umbra_secure_mail_test",
+                "umbra_demo"
             ],
             "default": "umbra_crypto_rsa_engine_test"
+        },
+        {
+            "id": "programArgs",
+            "type": "promptString",
+            "description": "Program arguments (e.g. demo input file and output dir; leave empty for tests)",
+            "default": ""
         }
     ]
 }
