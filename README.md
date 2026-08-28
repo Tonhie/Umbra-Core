@@ -60,11 +60,11 @@ CA_root（自签名）
 ```bash
 # Debug 构建
 cmake --preset debug
-cmake --build build/debug
+cmake --build --preset debug
 
 # Release 构建
 cmake --preset release
-cmake --build build/release
+cmake --build --preset release
 ```
 
 如果需要从仓库中的源码重新构建 GMP 和 NTL：
@@ -72,7 +72,7 @@ cmake --build build/release
 ```bash
 ./scripts/build_deps.sh
 cmake --preset debug
-cmake --build build/debug
+cmake --build --preset debug
 ```
 
 `build_deps.sh` 会删除并重新生成 `third_party/build` 与 `third_party/local`，执行前请确认其中没有需要保留的本地文件。
@@ -80,7 +80,7 @@ cmake --build build/debug
 ## 运行测试
 
 ```bash
-ctest --test-dir build/debug --output-on-failure
+ctest --preset debug
 ```
 
 测试覆盖以下模块：
