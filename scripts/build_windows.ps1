@@ -45,9 +45,7 @@ if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
 }
 
 $bash = Join-Path $MsysRoot 'usr\bin\bash.exe'
-$ucrtShell = Join-Path $MsysRoot 'ucrt64.exe'
 $shellLauncher = $bash
-if (Test-Path -LiteralPath $ucrtShell) { $shellLauncher = $ucrtShell }
 $rootUnix = (& (Join-Path $MsysRoot 'usr\bin\cygpath.exe') -u $workspace).Trim()
 $srcUnix = $rootUnix + '/third_party/src'
 $buildUnix = $rootUnix + '/third_party/build/msys2'
@@ -107,3 +105,9 @@ Write-Host 'Building GMP, NTL, and Umbra-Core with MSYS2.'
 if ($LASTEXITCODE -ne 0) { throw 'MSYS2 dependency build failed.' }
 
 Write-Host ('Build completed: ' + $buildWindows)
+
+$gmpLib = Join-Path $workspace 'third_party\local-msys2\lib\libgmp.a'
+$ntlLib = Join-Path $workspace 'third_party\local-msys2\lib\libntl.a'
+if (-not (Test-Path -LiteralPath $gmpLib) -or -not (Test-Path -LiteralPath $ntlLib)) {
+    throw 'Build reported success, but GMP/NTL libraries were not produced.'
+}
