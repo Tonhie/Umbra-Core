@@ -51,10 +51,25 @@ $buildUnix = $rootUnix + '/third_party/build/msys2'
 $localUnix = $rootUnix + '/third_party/local-msys2'
 $buildWindows = Join-Path $workspace 'build\windows-msys2'
 
+# The first MSYS2 runtime update terminates all MSYS2 processes by design.
+# Run the update separately and retry it once after the runtime has restarted.
+$updated = $false
+for ($attempt = 1; $attempt -le 3; $attempt++) {
+    Write-Host ('Updating MSYS2 (attempt ' + $attempt + ' of 3).')
+    & $bash '--login' '-lc' 'pacman -Syu --noconfirm'
+    if ($LASTEXITCODE -eq 0) {
+        $updated = $true
+        break
+    }
+    Start-Sleep -Seconds 2
+}
+if (-not $updated) {
+    throw 'MSYS2 update did not complete after three attempts.'
+}
+
 $bashScript = @"
 set -e
 export MSYS2_ARG_CONV_EXCL='*'
-pacman -Syu --noconfirm
 export PATH=/ucrt64/bin:`$PATH
 pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
 mkdir -p '$buildUnix' '$localUnix'
@@ -80,7 +95,7 @@ cmake -S '$rootUnix' -B '$rootUnix/build/windows-msys2' -G Ninja -DCMAKE_BUILD_T
 cmake --build '$rootUnix/build/windows-msys2' --target all
 "@
 
-Write-Host 'Updating MSYS2 and building GMP/NTL.'
+Write-Host 'Building GMP, NTL, and Umbra-Core with MSYS2.'
 & $bash '--login' '-lc' $bashScript
 if ($LASTEXITCODE -ne 0) { throw 'MSYS2 dependency build failed.' }
 
