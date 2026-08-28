@@ -79,6 +79,8 @@ export CXX=g++
 export AR=ar
 export RANLIB=ranlib
 export LD=ld
+export CFLAGS='-std=gnu89'
+export CXXFLAGS='-std=gnu++17'
 pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
 mkdir -p '$buildUnix' '$localUnix'
 
