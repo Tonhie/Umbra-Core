@@ -76,6 +76,9 @@ export MINGW_PREFIX=/ucrt64
 export PATH=/ucrt64/bin:`$PATH
 export CC=gcc
 export CXX=g++
+export AR=ar
+export RANLIB=ranlib
+export LD=ld
 pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
 mkdir -p '$buildUnix' '$localUnix'
 
@@ -83,7 +86,7 @@ echo 'Building GMP from third_party/src ...'
 rm -rf '$buildUnix/gmp-6.3.0'
 mkdir -p '$buildUnix/gmp-6.3.0'
 cd '$buildUnix/gmp-6.3.0'
-'$srcUnix/gmp-6.3.0/configure' --build=x86_64-pc-msys --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --with-pic
+ABI=64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ '$srcUnix/gmp-6.3.0/configure' --build=x86_64-pc-msys --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --disable-assembly --with-pic
 make -j`$(nproc)
 make install
 
