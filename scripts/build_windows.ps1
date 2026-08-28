@@ -10,7 +10,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $workspace = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 
-function Require-Command([string]$Name) {
+function Require-Command {
+    param([Parameter(Mandatory = $true)][string]$Name)
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
         throw "找不到 $Name。请在‘开发者 PowerShell for VS 2022’中运行此脚本。"
     }
