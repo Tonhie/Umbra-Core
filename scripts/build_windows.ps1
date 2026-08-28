@@ -88,7 +88,7 @@ echo 'Building GMP from third_party/src ...'
 rm -rf '$buildUnix/gmp-6.3.0'
 mkdir -p '$buildUnix/gmp-6.3.0'
 cd '$buildUnix/gmp-6.3.0'
-ABI=64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ '$srcUnix/gmp-6.3.0/configure' --build=x86_64-pc-msys --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --disable-assembly --with-pic
+CFLAGS='-std=gnu89 -fno-strict-prototypes' CXXFLAGS='-std=gnu++17' ABI=64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ '$srcUnix/gmp-6.3.0/configure' --build=x86_64-pc-msys --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --disable-assembly --with-pic
 make -j`$(nproc)
 make install
 
