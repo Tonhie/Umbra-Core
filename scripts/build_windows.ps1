@@ -45,6 +45,9 @@ if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
 }
 
 $bash = Join-Path $MsysRoot 'usr\bin\bash.exe'
+$ucrtShell = Join-Path $MsysRoot 'ucrt64.exe'
+$shellLauncher = $bash
+if (Test-Path -LiteralPath $ucrtShell) { $shellLauncher = $ucrtShell }
 $rootUnix = (& (Join-Path $MsysRoot 'usr\bin\cygpath.exe') -u $workspace).Trim()
 $srcUnix = $rootUnix + '/third_party/src'
 $buildUnix = $rootUnix + '/third_party/build/msys2'
@@ -56,7 +59,7 @@ $buildWindows = Join-Path $workspace 'build\windows-msys2'
 $updated = $false
 for ($attempt = 1; $attempt -le 3; $attempt++) {
     Write-Host ('Updating MSYS2 (attempt ' + $attempt + ' of 3).')
-    & $bash '--login' '-lc' 'pacman -Syu --noconfirm'
+    & $shellLauncher '--login' '-lc' 'pacman -Syu --noconfirm'
     if ($LASTEXITCODE -eq 0) {
         $updated = $true
         break
@@ -73,6 +76,8 @@ export MSYS2_ARG_CONV_EXCL='*'
 export MSYSTEM=UCRT64
 export MINGW_PREFIX=/ucrt64
 export PATH=/ucrt64/bin:`$PATH
+export CC=gcc
+export CXX=g++
 pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
 mkdir -p '$buildUnix' '$localUnix'
 
@@ -80,7 +85,7 @@ echo 'Building GMP from third_party/src ...'
 rm -rf '$buildUnix/gmp-6.3.0'
 mkdir -p '$buildUnix/gmp-6.3.0'
 cd '$buildUnix/gmp-6.3.0'
-'$srcUnix/gmp-6.3.0/configure' --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --with-pic
+'$srcUnix/gmp-6.3.0/configure' --build=x86_64-pc-msys --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --with-pic
 make -j`$(nproc)
 make install
 
@@ -98,7 +103,7 @@ cmake --build '$rootUnix/build/windows-msys2' --target all
 "@
 
 Write-Host 'Building GMP, NTL, and Umbra-Core with MSYS2.'
-& $bash '--login' '-lc' $bashScript
+& $shellLauncher '--login' '-lc' $bashScript
 if ($LASTEXITCODE -ne 0) { throw 'MSYS2 dependency build failed.' }
 
 Write-Host ('Build completed: ' + $buildWindows)
