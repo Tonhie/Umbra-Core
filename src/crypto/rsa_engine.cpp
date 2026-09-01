@@ -205,4 +205,3 @@ bool SignatureEngine::verify(
 
     return recovered_digest == expected_digest;
 }
-

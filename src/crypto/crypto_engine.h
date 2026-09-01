@@ -73,4 +73,3 @@ std::unique_ptr<EncryptionEngine> create_encryption_engine(CryptoType type);
 std::unique_ptr<SignatureEngine> create_signature_engine(CryptoType type);
 
 } // namespace umbra::crypto
-
