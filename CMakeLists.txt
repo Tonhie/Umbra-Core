@@ -3,6 +3,29 @@ project(UmbraCore VERSION 1.0.0 LANGUAGES CXX)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(ProjectOptions)
 include(Dependencies)
+find_package(Threads REQUIRED)
+
+# MinGW executables can either carry their compiler runtimes statically or
+# deploy DLLs next to the executable.  Static linkage is the default for the
+# demo so a first-time Windows user can launch it from PowerShell without
+# editing PATH.  Set UMBRA_MINGW_STATIC_RUNTIME=OFF to use DLL deployment.
+if(MINGW)
+  get_filename_component(UMBRA_MINGW_BIN_DIR "${CMAKE_CXX_COMPILER}" DIRECTORY)
+  option(UMBRA_MINGW_STATIC_RUNTIME "Statically link MinGW compiler runtimes" ON)
+  function(umbra_deploy_mingw_runtime target)
+    foreach(runtime_dll IN ITEMS libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll)
+      add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+          "${UMBRA_MINGW_BIN_DIR}/${runtime_dll}"
+          "$<TARGET_FILE_DIR:${target}>"
+        VERBATIM)
+
+    endforeach()
+  endfunction()
+  if(UMBRA_MINGW_STATIC_RUNTIME)
+    add_link_options(-static-libgcc -static-libstdc++ -static)
+  endif()
+endif()
 
 add_library(umbra_hash src/hash/sha_256.cpp)
 target_include_directories(umbra_hash PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src> $<INSTALL_INTERFACE:include>)
@@ -34,7 +57,10 @@ umbra_add_test(umbra_certificate_library_test tests/certificate/certificate_libr
 umbra_add_test(umbra_pki_user_test tests/pki/pki_user_test.cpp pki.pki_user umbra_certificate)
 umbra_add_test(umbra_secure_mail_test tests/mail/secure_mail_test.cpp mail.secure_mail umbra_mail)
 add_executable(umbra_demo src/demo/umbra_demo.cpp)
-target_link_libraries(umbra_demo PRIVATE umbra_mail)
+target_link_libraries(umbra_demo PRIVATE umbra_mail Threads::Threads)
+if(MINGW AND NOT UMBRA_MINGW_STATIC_RUNTIME)
+  umbra_deploy_mingw_runtime(umbra_demo)
+endif()
 
 include(GNUInstallDirs)
 install(TARGETS umbra_hash umbra_crypto umbra_certificate umbra_mail EXPORT UmbraCoreTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

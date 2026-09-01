@@ -1,195 +1,92 @@
 # Umbra-Core
 
-基于 C++17 与 NTL 的现代密码学课程设计实现。项目以模块化方式实现 RSA、Elgamal、SHA-256、简单证书方案、层次化简易 PKI 以及无需网络传输的安全邮件流程。
+基于 C++17、NTL 和 GMP 的现代密码学课程设计实现。项目包含 RSA、ElGamal、SHA-256、证书方案、严格层次 PKI 和安全邮件模块。
 
-> 本项目用于课程学习、算法演示和单元测试，不是生产级密码库。实现使用教学目的的裸 RSA/Elgamal 分组加密与签名方案，未提供 OAEP、PSS、混合加密、密钥保护或完整的证书撤销机制。请勿直接用于保护真实敏感数据。
+## 依赖与构建
 
-## 功能概览
-
-- RSA：密钥生成、分组加密/解密、SHA-256 摘要签名与验证、密钥文本序列化。
-- Elgamal：密钥生成、分组加密/解密、签名与验证、密钥文本序列化。
-- SHA-256：基于 FIPS 180-4 的哈希实现，支持文件/字符串场景所需的摘要计算。
-- 简单证书：TA 为用户签发证书，证书支持 RSA 与 Elgamal 公钥以及“加密/签名”用途标记。
-- 简易 PKI：根 CA 自签名、下级 CA 签发用户证书、证书库查询和证书链验证。
-- 安全邮件：发送方对邮件摘要签名，再使用接收方加密公钥加密 `m || s`；接收方解密并验证发送方证书链和签名。
-
-## 项目结构
-
-```text
-src/
-├── crypto/                 RSA、Elgamal 与密码引擎抽象接口
-├── hash/                   SHA-256
-├── certificate/            证书、TA、CA、证书库与证书链验证
-├── pki/                    PKI 用户对象
-├── mail/                   安全邮件收发流程
-└── demo/                   完整流程演示程序
-tests/                      各模块独立测试
-docs/                       课程设计说明书
-third_party/                GMP/NTL 源码及本地静态库安装目录
-scripts/build_deps.sh       从源码构建 GMP 与 NTL
-```
-
-库之间的依赖关系如下：
-
-```text
-umbra_mail → umbra_certificate → umbra_crypto → umbra_hash
-```
-
-PKI 演示采用如下证书层次：
-
-```text
-CA_root（自签名）
-├── CA1 ── Alice、Eve
-└── CA2 ── Bob
-```
-
-## 环境要求
-
-- CMake 3.23 或更高版本
+- CMake 3.23+
 - Ninja
-- 支持 C++17 的编译器
-- GMP 6.3.0
-- NTL 11.6.0
+- C++17 编译器
+- GMP 6.3.0 与 NTL 11.6.0
 
-项目默认从 `third_party/local` 查找 NTL/GMP 的头文件和静态库。仓库通常已包含可用的本地依赖构建结果；如果当前平台不兼容，可按下节重新构建依赖。
-
-## 构建
-
-在项目根目录执行：
-
-```bash
-# Debug 构建
-cmake --preset debug
-cmake --build --preset debug
-
-# Release 构建
-cmake --preset release
-cmake --build --preset release
-```
-
-如果需要从仓库中的源码重新构建 GMP 和 NTL：
+Linux（GCC/Clang）：
 
 ```bash
 ./scripts/build_deps.sh
 cmake --preset debug
 cmake --build --preset debug
+ctest --preset debug
 ```
 
-`build_deps.sh` 会删除并重新生成 `third_party/build` 与 `third_party/local`，执行前请确认其中没有需要保留的本地文件。
-
-Windows 可在 PowerShell 中自动安装 MSYS2、从仓库源码编译 GMP/NTL，并使用 MSYS2 的 UCRT64 GCC 编译：
+Windows 推荐使用 MSYS2 UCRT64。PowerShell 脚本会优先复用已安装的 MSYS2，缺失时才尝试通过 winget 安装，并自动安装或准备 GMP/NTL：
 
 ```powershell
 .\scripts\build_windows.ps1
-```
-
-脚本会检查 MSYS2；若不存在则通过 winget 安装。依赖库会安装到 `third_party/local-msys2`，项目输出目录为 `build/windows-msys2`。这是 MinGW/UCRT64 构建，不能与 VS2022 的 MSVC 编译器或其 `.lib` 文件混用。发布构建示例：
-
-```powershell
 .\scripts\build_windows.ps1 -Configuration Release
 ```
 
-## 运行测试
+依赖安装到 `third_party/local-msys2`，项目输出到 `build/windows-mingw-debug` 或 `build/windows-mingw-release`。MinGW 构建默认将编译器运行时静态链接进可执行文件，因此生成的 `umbra_demo.exe` 可直接从普通 PowerShell 启动，不需要复制 DLL 或修改 PATH。如果依赖已经准备好，也可直接使用 CMake 预设：
+
+```powershell
+cmake --preset windows-mingw-debug
+cmake --build --preset windows-mingw-debug
+```
+
+注意：`cmake --build` 只执行已有构建目录的编译；第一次构建必须先执行 `cmake --preset`，并且当前 PowerShell 必须能找到 MSYS2 UCRT64 的 `gcc`、`g++` 和 `ninja`。最省事的方式是直接运行上面的 `build_windows.ps1`。如果要手动使用预设，请先在当前窗口加入工具路径：
+
+```powershell
+$env:Path = "C:\msys64\ucrt64\bin;C:\msys64\usr\bin;$env:Path"
+cmake --preset windows-mingw-debug
+cmake --build --preset windows-mingw-debug
+```
+
+若 MSYS2 安装在其他目录，请相应替换路径；也可以给脚本传入 `-MsysRoot`。
+
+本项目只维护 GCC/Clang 和 MSYS2 UCRT64 MinGW 两类构建，不提供 MSVC、x86 或单独的 x64 预设。若确实需要动态运行时，可配置 `-DUMBRA_MINGW_STATIC_RUNTIME=OFF`，CMake 会把所需 DLL 复制到 exe 旁边。
+
+## 演示程序
+
+无参数启动进入交互式 ASCII TUI 邮箱（不需要网络或 GUI）：
+
+```powershell
+.\build\windows-mingw-debug\umbra_demo.exe
+```
+
+左栏是操作界面（启动时默认选中 Alice），右栏是紧凑的后台加密过程日志。可以切换 Alice、Bob、Eve，查看收件箱，撰写多行邮件（单独输入 `.` 结束正文），发送并阅读邮件。发送也可直接输入 `s`/`send`/`compose`。发送和阅读会在后台线程执行，右栏会实时显示密钥生成、证书签发与入库、证书链查询/验证、摘要计算、签名、`m || s` 组装、加密、投递、解密和验签等步骤，并仅显示算法、对象名称和长度等元数据；不会输出密钥、证书、明文、签名或密文的实际内容。输入 `[6]` 可查看完整过程日志，`[7]` 清空日志。邮件密文只在本地内存传输队列中流转。
+
+原来的五任务批处理演示仍可用：
+
+```powershell
+umbra_demo.exe --batch [input.txt] [output-dir]
+```
+
+批处理依次演示 RSA、ElGamal、简单证书、严格层次 PKI 和安全邮件，并把密钥、证书、密文和恢复后的邮件写入输出目录。省略 `input.txt` 时使用内置示例，省略输出目录时使用 `demo_output`。
+
+## 项目结构
+
+```text
+src/crypto/       RSA 与 ElGamal 引擎
+src/hash/         SHA-256
+src/certificate/  证书、TA、CA、证书库与链验证
+src/pki/          PKI 用户对象
+src/mail/         安全邮件协议
+src/demo/         交互式与批处理演示
+tests/            各模块单元测试
+docs/             课程设计报告、历史材料与任务书
+```
+
+库依赖方向为 `umbra_mail -> umbra_certificate -> umbra_crypto -> umbra_hash`。安全邮件协议不依赖网络：发送端对邮件摘要签名，再用接收端加密公钥加密 `m || s`；接收端解密后验证发送者证书链和签名。
+
+## 测试
 
 ```bash
 ctest --preset debug
 ```
 
-测试覆盖以下模块：
+测试覆盖 RSA/ElGamal 加解密与签名、SHA-256、证书序列化与验证、证书库路径、PKI 用户以及安全邮件的篡改和错误密钥拒绝场景。
 
-| 测试目标 | 覆盖内容 |
-| --- | --- |
-| `crypto.rsa_engine` | RSA 加解密、签名和验证正反例 |
-| `crypto.elgamal_engine` | Elgamal 加解密、签名和验证正反例 |
-| `hash.sha_256` | SHA-256 标准向量和流式一致性 |
-| `certificate.certificate` | 证书序列化、公钥转换、证书签名验证 |
-| `certificate.trusted_authority` | TA 签发 RSA/Elgamal 证书及篡改拒绝 |
-| `certificate.certificate_authority` | 根 CA 自签名和下级证书签发 |
-| `certificate.certificate_library` | 证书库存储、路径查询和链验证 |
-| `pki.pki_user` | 用户双证书申请、签名和验证 |
-| `mail.secure_mail` | 安全邮件往返及异常输入拒绝 |
+## 说明
 
-## 运行演示
+这是用于课程学习和算法演示的实现，不是生产级密码库；未提供 OAEP、PSS、密钥保护、证书有效期或吊销机制。
 
-演示程序会依次运行 RSA、Elgamal、简单证书、简易 PKI 和安全邮件流程：
-
-```bash
-# 使用内置示例邮件，输出到 ./demo_output
-./build/debug/umbra_demo
-
-# 使用指定文件作为明文/邮件内容，并指定输出目录
-./build/debug/umbra_demo path/to/plaintext.txt path/to/output
-```
-
-演示会在输出目录生成密钥、证书、证书链、密文、签名和恢复后的邮件等文件，例如：
-
-```text
-demo_output/
-├── rsa/
-│   ├── rsa_public_key.txt
-│   ├── rsa_private_key.txt
-│   ├── rsa_ciphertext.txt
-│   └── rsa_signature.txt
-├── elgamal/
-├── certificates/
-├── pki/
-│   ├── root.cert
-│   ├── ca1.cert
-│   ├── alice_chain.txt
-│   └── ...
-└── mail/
-    ├── mail_ciphertext.txt
-    └── mail_recovered.txt
-```
-
-演示程序中的 Elgamal 使用 512 位参数以缩短运行时间；库的默认 Elgamal 参数规模为 2048 位。RSA 演示使用两个 1024 位素数。
-
-## 证书与安全邮件格式
-
-证书为文本格式，结构示例：
-
-```text
-BEGIN UMBRA CERTIFICATE
-ISSUER:TA
-SUBJECT:Alice
-ALGORITHM:RSA
-PURPOSE:Encryption
-PUBLIC_KEY:RSA <n> <e>
-SIGNATURE:
-<signature>
-END UMBRA CERTIFICATE
-```
-
-证书签名覆盖主题身份与公钥文本，即课程设计中的 `ID(subject) || ver_subject`。证书路径按“根证书 → 下级 CA 证书 → 叶证书”排列，并逐级验证签名。
-
-安全邮件流程为：
-
-```text
-邮件 m
-  └─ SHA-256(m) + 发送方签名 → s
-       └─ 拼接 m || s
-            └─ 接收方加密公钥加密 → 密文 c
-```
-
-接收方使用自己的加密私钥解密，再从证书库查询并验证发送方的签名公钥证书链，最后验证邮件签名。
-
-## API 模块
-
-主要公共接口位于以下头文件：
-
-- `src/crypto/crypto_engine.h`：密码引擎、密钥和算法工厂。
-- `src/hash/sha_256.h`：SHA-256 接口。
-- `src/certificate/certificate.h`：证书对象、公钥转换和证书链验证。
-- `src/certificate/trusted_authority.h`：简单 TA。
-- `src/certificate/certificate_authority.h`：层次 PKI 中的 CA。
-- `src/certificate/certificate_library.h`：证书存储与路径查询。
-- `src/pki/pki_user.h`：PKI 用户及密钥/证书管理。
-- `src/mail/secure_mail.h`：签名、加密、解密和安全邮件收发流程。
-
-## 课程设计文档
-
-更完整的算法说明、设计决策、文件格式和测试结果见：[课程设计说明书](docs/课程设计说明书.md)。对应 PDF 版本位于 `docs/课程设计说明书.pdf`。
-
-## 许可证
-
-本项目采用 MIT License，详见 [LICENCE](LICENCE)。
+课程设计报告见 `docs/现代密码学课程设计报告.md`；任务分解和演示要求以 `docs/2026现代密码学课程设计任务书新版本.ppt` 为准。仓库中的旧 PDF 仅作为历史材料保留，不作为新报告的章节依据。

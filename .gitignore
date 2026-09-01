@@ -43,6 +43,7 @@
 build/
 Build/
 build-*/
+third_party/local-msys2/
 
 # CMake generated files
 CMakeFiles/

@@ -15,8 +15,6 @@ function Require-Command {
     }
 }
 
-Require-Command 'winget'
-
 if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
     $candidates = @('C:\msys64', (Join-Path $env:LOCALAPPDATA 'Programs\msys64'))
     foreach ($candidate in $candidates) {
@@ -28,6 +26,7 @@ if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($MsysRoot)) {
+    Require-Command 'winget'
     Write-Host 'MSYS2 was not found. Installing it with winget.'
     & winget install --id MSYS2.MSYS2 --exact --accept-source-agreements --accept-package-agreements
     if ($LASTEXITCODE -ne 0) { throw 'MSYS2 installation failed.' }
@@ -50,23 +49,8 @@ $rootUnix = (& (Join-Path $MsysRoot 'usr\bin\cygpath.exe') -u $workspace).Trim()
 $srcUnix = $rootUnix + '/third_party/src'
 $buildUnix = $rootUnix + '/third_party/build/msys2'
 $localUnix = $rootUnix + '/third_party/local-msys2'
-$buildWindows = Join-Path $workspace 'build\windows-msys2'
-
-# The first MSYS2 runtime update terminates all MSYS2 processes by design.
-# Run the update separately and retry it once after the runtime has restarted.
-$updated = $false
-for ($attempt = 1; $attempt -le 3; $attempt++) {
-    Write-Host ('Updating MSYS2 (attempt ' + $attempt + ' of 3).')
-    & $shellLauncher '--login' '-lc' 'pacman -Syu --noconfirm'
-    if ($LASTEXITCODE -eq 0) {
-        $updated = $true
-        break
-    }
-    Start-Sleep -Seconds 2
-}
-if (-not $updated) {
-    throw 'MSYS2 update did not complete after three attempts.'
-}
+$presetName = if ($Configuration -eq 'Release') { 'windows-mingw-release' } else { 'windows-mingw-debug' }
+$buildWindows = Join-Path $workspace ('build\' + $presetName)
 
 $bashScript = @"
 set -e
@@ -81,28 +65,43 @@ export RANLIB=ranlib
 export LD=ld
 export CFLAGS='-std=gnu89'
 export CXXFLAGS='-std=gnu++17'
-pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja
+pacman -S --needed --noconfirm make diffutils m4 perl autoconf automake libtool \
+  mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja \
+  mingw-w64-ucrt-x86_64-gmp mingw-w64-ucrt-x86_64-ntl mingw-w64-ucrt-x86_64-gf2x
 mkdir -p '$buildUnix' '$localUnix'
 
-echo 'Building GMP from third_party/src ...'
-rm -rf '$buildUnix/gmp-6.3.0'
-mkdir -p '$buildUnix/gmp-6.3.0'
-cd '$buildUnix/gmp-6.3.0'
-CFLAGS='-std=gnu89' CXXFLAGS='-std=gnu++17' ABI=64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ '$srcUnix/gmp-6.3.0/configure' --build=x86_64-w64-mingw32 --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --disable-assembly --with-pic
-make -j`$(nproc)
-make install
+if [ -f /ucrt64/include/gmp.h ] && [ -f /ucrt64/include/NTL/ZZ.h ] && \
+   [ -f /ucrt64/lib/libgmp.a ] && [ -f /ucrt64/lib/libgmpxx.a ] && [ -f /ucrt64/lib/libntl.a ]; then
+  echo 'Using GMP/NTL already installed in MSYS2 UCRT64 ...'
+  mkdir -p '$localUnix/include' '$localUnix/lib'
+  cp -f /ucrt64/include/gmp.h /ucrt64/include/gmpxx.h '$localUnix/include/'
+  rm -rf '$localUnix/include/NTL'
+  cp -R /ucrt64/include/NTL '$localUnix/include/NTL'
+  cp -f /ucrt64/lib/libgmp.a /ucrt64/lib/libgmpxx.a /ucrt64/lib/libntl.a '$localUnix/lib/'
+else
+  echo 'MSYS2 packages were not found; building GMP from third_party/src ...'
+  rm -rf '$buildUnix/gmp-6.3.0'
+  mkdir -p '$buildUnix/gmp-6.3.0'
+  cd '$buildUnix/gmp-6.3.0'
+  CFLAGS='-std=gnu89' CXXFLAGS='-std=gnu++17' ABI=64 CC=x86_64-w64-mingw32-gcc CXX=x86_64-w64-mingw32-g++ '$srcUnix/gmp-6.3.0/configure' --build=x86_64-w64-mingw32 --host=x86_64-w64-mingw32 --prefix='$localUnix' --enable-cxx --enable-static --disable-shared --disable-assembly --with-pic
+  make -j`$(nproc)
+  make install
 
-echo 'Building NTL from third_party/src ...'
-rm -rf '$buildUnix/ntl-11.6.0'
-cp -R '$srcUnix/ntl-11.6.0' '$buildUnix/ntl-11.6.0'
-cd '$buildUnix/ntl-11.6.0/src'
-'$srcUnix/ntl-11.6.0/src/configure' HOST=x86_64-w64-mingw32 PREFIX='$localUnix' GMP_PREFIX='$localUnix' NTL_GMP_LIP=on SHARED=off
-make -j`$(nproc)
-make install
+  echo 'Building NTL from third_party/src ...'
+  rm -rf '$buildUnix/ntl-11.6.0'
+  cp -R '$srcUnix/ntl-11.6.0' '$buildUnix/ntl-11.6.0'
+  cd '$buildUnix/ntl-11.6.0/src'
+  '$srcUnix/ntl-11.6.0/src/configure' HOST=x86_64-w64-mingw32 PREFIX='$localUnix' GMP_PREFIX='$localUnix' NTL_GMP_LIP=on SHARED=off
+  make -j`$(nproc)
+  make install
+fi
 
 echo 'Configuring Umbra-Core ...'
-cmake -S '$rootUnix' -B '$rootUnix/build/windows-msys2' -G Ninja -DCMAKE_BUILD_TYPE='$Configuration' -DUMBRA_DEPS_PREFIX='$localUnix'
-cmake --build '$rootUnix/build/windows-msys2' --target all
+root_win=`$(cygpath -w '$rootUnix')
+build_win=`$(cygpath -w '$rootUnix/build/$presetName')
+local_win=`$(cygpath -w '$localUnix')
+cmake -S "`$root_win" -B "`$build_win" -G Ninja -DCMAKE_BUILD_TYPE='$Configuration' -DUMBRA_DEPS_PREFIX="`$local_win"
+cmake --build "`$build_win" --target all
 "@
 
 Write-Host 'Building GMP, NTL, and Umbra-Core with MSYS2.'
